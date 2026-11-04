@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}จัดการผู้ใช้งาน{% endblock %}
+{% block page_header %}จัดการผู้ใช้งานระบบ (ผู้ดูแลระบบ){% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Add New User Card -->
+    <div class="col-lg-4">
+        <div class="gdms-card">
+            <div class="gdms-card-header">
+                <div><i class="bi bi-person-plus-fill me-2"></i>เพิ่มผู้ใช้งานใหม่</div>
+            </div>
+            <div class="p-4">
+                <form method="POST" action="{{ url_for('admin_users') }}">
+                    <input type="hidden" name="action" value="create">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ชื่อผู้ใช้งาน (Username) <span class="text-danger">*</span></label>
+                        <input type="text" name="username" class="form-control" placeholder="เช่น somchai" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">รหัสผ่านเริ่มต้น <span class="text-danger">*</span></label>
+                        <input type="password" name="password" class="form-control" placeholder="อย่างน้อย 4 ตัวอักษร" minlength="4" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ชื่อ - นามสกุล <span class="text-danger">*</span></label>
+                        <input type="text" name="full_name" class="form-control" placeholder="เช่น นางสาวศิรินภา คงชื่น" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ตำแหน่ง / กลุ่มงาน</label>
+                        <input type="text" name="position" class="form-control" placeholder="เช่น เจ้าพนักงานศาลยุติธรรม">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">ระดับสิทธิ์การใช้งาน</label>
+                        <select name="role" class="form-select">
+                            <option value="user" selected>ผู้ใช้งานทั่วไป (บันทึก/แก้ไขรายการตนเอง)</option>
+                            <option value="admin">ผู้ดูแลระบบ / Admin (จัดการได้ทุกรายการ)</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-teal w-100 fw-semibold">
+                        <i class="bi bi-plus-circle me-1"></i>สร้างบัญชีผู้ใช้งาน
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table Card -->
+    <div class="col-lg-8">
+        <div class="gdms-card">
+            <div class="gdms-card-header">
+                <div><i class="bi bi-people-fill me-2"></i>รายชื่อผู้ใช้งานทั้งหมด ({{ users|length }} บัญชี)</div>
+            </div>
+            <div class="p-4">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Username</th>
+                                <th>ชื่อ - นามสกุล</th>
+                                <th>ตำแหน่ง</th>
+                                <th class="text-center">สิทธิ์</th>
+                                <th class="text-center">สถานะ</th>
+                                <th class="text-center">บันทึกแล้ว</th>
+                                <th class="text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in users %}
+                            <tr>
+                                <td class="fw-semibold text-teal">{{ u.username }}</td>
+                                <td class="fw-bold">{{ u.full_name }}</td>
+                                <td class="small text-secondary">{{ u.position or '-' }}</td>
+                                <td class="text-center">
+                                    {% if u.role == 'admin' %}
+                                    <span class="badge bg-primary">Admin</span>
+                                    {% else %}
+                                    <span class="badge bg-light text-dark border">ผู้ใช้งานทั่วไป</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if u.is_active == 1 %}
+                                    <span class="badge bg-success-subtle text-success">ปกติ</span>
+                                    {% else %}
+                                    <span class="badge bg-danger-subtle text-danger">ระงับ</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">{{ u.doc_count }} เรื่อง</td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                            data-id="{{ u.id }}"
+                                            data-username="{{ u.username }}"
+                                            data-fullname="{{ u.full_name }}"
+                                            data-position="{{ u.position or '' }}"
+                                            data-role="{{ u.role }}"
+                                            data-active="{{ u.is_active }}"
+                                            onclick="openEditUserModal(this)">
+                                        <i class="bi bi-pencil"></i> แก้ไข
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content border-0 shadow" method="POST" action="{{ url_for('admin_users') }}">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="user_id" id="editUserId">
+
+            <div class="modal-header bg-teal text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-gear me-2"></i>แก้ไขข้อมูลผู้ใช้งาน (<span id="editUsernameLabel"></span>)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">ชื่อ - นามสกุล <span class="text-danger">*</span></label>
+                    <input type="text" name="full_name" id="editFullName" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">ตำแหน่ง</label>
+                    <input type="text" name="position" id="editPosition" class="form-control">
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">ระดับสิทธิ์</label>
+                        <select name="role" id="editRole" class="form-select">
+                            <option value="user">ผู้ใช้งานทั่วไป</option>
+                            <option value="admin">ผู้ดูแลระบบ (Admin)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">สถานะการใช้งาน</label>
+                        <select name="is_active" id="editActive" class="form-select">
+                            <option value="1">เปิดใช้งานปกติ</option>
+                            <option value="0">ระงับการใช้งาน</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-1">
+                    <label class="form-label fw-bold text-danger">ตั้งรหัสผ่านใหม่ (เว้นว่างไว้หากไม่ต้องการเปลี่ยน)</label>
+                    <input type="password" name="new_password" class="form-control" placeholder="กรอกรหัสผ่านใหม่เมื่อต้องการรีเซ็ต">
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" class="btn btn-teal px-4">บันทึก</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function openEditUserModal(btn) {
+        document.getElementById('editUserId').value = btn.dataset.id;
+        document.getElementById('editUsernameLabel').textContent = btn.dataset.username;
+        document.getElementById('editFullName').value = btn.dataset.fullname;
+        document.getElementById('editPosition').value = btn.dataset.position;
+        document.getElementById('editRole').value = btn.dataset.role;
+        document.getElementById('editActive').value = btn.dataset.active;
+
+        const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+        modal.show();
+    }
+</script>
+{% endblock %}
