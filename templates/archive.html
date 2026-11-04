@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+{% block title %}แฟ้มเก็บคำสั่งและประกาศ{% endblock %}
+{% block page_header %}แฟ้มเก็บคำสั่งและประกาศศาล{% endblock %}
+
+{% block content %}
+<!-- Quick Current Year Summary Cards -->
+<div class="row g-3 mb-4">
+    {% for dt in DOC_TYPES %}
+    {% set st = stats_by_type[dt] %}
+    <div class="col-xl-3 col-sm-6">
+        <div class="gdms-card p-3 h-100 border-start border-4 {% if loop.index == 1 %}border-primary{% elif loop.index == 2 %}border-info{% elif loop.index == 3 %}border-success{% else %}border-warning{% endif %}">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="text-secondary small fw-semibold">{{ dt }} (พ.ศ. {{ current_byear }})</div>
+                    <div class="fs-4 fw-bold text-dark mt-1">
+                        เลขถัดไป: <span class="text-teal">{{ st.next_num }}/{{ current_byear }}</span>
+                    </div>
+                </div>
+                <span class="badge bg-light text-secondary border">รวม {{ st.total }} เรื่อง</span>
+            </div>
+            <div class="d-flex gap-3 mt-2 pt-2 border-top small">
+                <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>จัดเก็บ: <strong>{{ st.stored }}</strong></span>
+                <span class="text-warning-emphasis"><i class="bi bi-clock-fill me-1 text-warning"></i>จองเลข: <strong>{{ st.reserved }}</strong></span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Main Archive Card matching screenshot -->
+<div class="gdms-card">
+    <div class="gdms-card-header">
+        <div>
+            <i class="bi bi-calendar2-check me-2"></i>คำสั่ง และประกาศ
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <!-- Quick Filter Pills -->
+            <form method="GET" action="{{ url_for('archive') }}" class="d-flex flex-wrap gap-2 align-items-center m-0">
+                <select name="year" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                    <option value="">ทุกปี พ.ศ.</option>
+                    {% for y in available_years %}
+                    <option value="{{ y }}" {% if year_filter == y|string %}selected{% endif %}>ปี พ.ศ. {{ y }}</option>
+                    {% endfor %}
+                </select>
+                <select name="doc_type" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                    <option value="">ทุกประเภท</option>
+                    {% for dt in DOC_TYPES %}
+                    <option value="{{ dt }}" {% if doc_type_filter == dt %}selected{% endif %}>{{ dt }}</option>
+                    {% endfor %}
+                </select>
+                <select name="status" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                    <option value="">ทุกสถานะ</option>
+                    <option value="reserved" {% if status_filter == 'reserved' %}selected{% endif %}>จอง (ยังไม่แนบไฟล์)</option>
+                    <option value="stored" {% if status_filter == 'stored' %}selected{% endif %}>จัดเก็บ (แนบไฟล์แล้ว)</option>
+                </select>
+                {% if year_filter or doc_type_filter or status_filter %}
+                <a href="{{ url_for('archive') }}" class="btn btn-sm btn-light text-dark">ล้างตัวกรอง</a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <div class="p-3 p-md-4">
+        <!-- Show entries & Global Search row matching screenshot -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+            <div class="d-flex align-items-center gap-2 text-secondary">
+                <span>Show</span>
+                <select id="pageSizeSelect" class="form-select form-select-sm" style="width: 75px;">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="999999">ทั้งหมด</option>
+                </select>
+                <span>entries</span>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <label for="globalSearchInput" class="mb-0 text-secondary">Search:</label>
+                <input type="search" id="globalSearchInput" class="form-control form-control-sm" style="width: 240px;" placeholder="ค้นหาทุกคอลัมน์...">
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-gdms mb-2" id="archiveTable">
+                <thead>
+                    <tr>
+                        <th style="width: 65px;" class="text-center">#</th>
+                        <th style="width: 115px;">คำสั่ง/<br>ลำดับ</th>
+                        <th style="width: 90px;" class="text-center">สถานะ</th>
+                        <th style="width: 135px;">ประเภท</th>
+                        <th>เรื่อง</th>
+                        <th style="width: 115px;">ลงวันที่</th>
+                        <th style="width: 165px;">ผู้บันทึก</th>
+                        <th style="width: 105px;" class="text-center">Action</th>
+                    </tr>
+                    <!-- Per-Column Search Inputs Row matching screenshot -->
+                    <tr class="bg-white">
+                        <th><input type="text" class="column-filter-input col-filter" data-col="0" placeholder="ค้นหา:#"></th>
+                        <th><input type="text" class="column-filter-input col-filter" data-col="1" placeholder="ค้นหา:คำสั่ง"></th>
+                        <th><input type="text" class="column-filter-input col-filter" data-col="2" placeholder="ค้นหา"></th>
+                        <th><input type="text" class="column-filter-input col-filter" data-col="3" placeholder="ค้นหา:ประเภท"></th>
+                        <th><input type="text" class="column-filter-input col-filter" data-col="4" placeholder="ค้นหา:เรื่อง"></th>
+                        <th><input type="text" class="column-filter-input col-filter" data-col="5" placeholder="ค้นหา:ลงวันที่"></th>
+                        <th><input type="text" class="column-filter-input col-filter" data-col="6" placeholder="ค้นหา:ผู้บันทึก"></th>
+                        <th><button type="button" class="btn btn-sm btn-outline-secondary w-100 py-0" id="clearColFilters" style="font-size: 0.78rem;">ล้างค้นหา</button></th>
+                    </tr>
+                </thead>
+                <tbody id="archiveTableBody">
+                    {% for doc in documents %}
+                    {% set can_edit = (session.get('role') == 'admin' or doc.created_by == session.get('user_id')) %}
+                    <tr class="doc-row">
+                        <td class="text-center text-secondary">{{ doc.id }}</td>
+                        <td>
+                            {% if doc.status == 'stored' and doc.file_path %}
+                            <a href="#" class="doc-num-badge"
+                               onclick="openPreviewModal('{{ doc.doc_type }} ที่ {{ doc.doc_number }}/{{ doc.doc_year }}', '{{ doc.title|e }}', '{{ url_for('serve_file', filename=doc.file_path) }}', '{{ doc.file_type }}', '{{ doc.original_filename|e }}'); return false;">
+                                {{ doc.doc_number }}/{{ doc.doc_year }}
+                            </a>
+                            {% else %}
+                            <span class="doc-num-badge">{{ doc.doc_number }}/{{ doc.doc_year }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if doc.status == 'stored' %}
+                            <span class="badge-status-stored">จัดเก็บ</span>
+                            {% else %}
+                            <span class="badge-status-reserved">จอง</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ doc.doc_type }}</td>
+                        <td>
+                            <div>{{ doc.title }}</div>
+                            {% if doc.note %}
+                            <div class="small text-muted mt-1"><i class="bi bi-chat-left-text me-1"></i>หมายเหตุ: {{ doc.note }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-primary fw-medium">{{ format_thai_date(doc.doc_date, short=True) }}</td>
+                        <td class="text-primary">{{ doc.creator_name or '-' }}</td>
+                        <td class="text-center">
+                            <div class="d-inline-flex gap-1 align-items-center justify-content-center">
+                                {% if doc.status == 'stored' and doc.file_path %}
+                                <!-- Green Paperclip Button to Preview/Download Attached File -->
+                                <button type="button" class="btn-action-attach" title="เปิดดูไฟล์เอกสารที่แนบ ({{ doc.original_filename }})"
+                                        onclick="openPreviewModal('{{ doc.doc_type }} ที่ {{ doc.doc_number }}/{{ doc.doc_year }}', '{{ doc.title|e }}', '{{ url_for('serve_file', filename=doc.file_path) }}', '{{ doc.file_type }}', '{{ doc.original_filename|e }}')">
+                                    <i class="bi bi-paperclip"></i>
+                                </button>
+                                {% endif %}
+
+                                {% if can_edit %}
+                                <!-- Blue Edit Button to Edit Info or Attach/Replace File -->
+                                <button type="button" class="btn-action-edit" title="แก้ไขข้อมูล / แนบไฟล์หรือเปลี่ยนไฟล์แนบ"
+                                        data-id="{{ doc.id }}"
+                                        data-doctype="{{ doc.doc_type }}"
+                                        data-docnum="{{ doc.doc_number }}/{{ doc.doc_year }}"
+                                        data-title="{{ doc.title }}"
+                                        data-docdate="{{ doc.doc_date }}"
+                                        data-note="{{ doc.note or '' }}"
+                                        data-status="{{ doc.status }}"
+                                        data-filename="{{ doc.original_filename or '' }}"
+                                        onclick="openEditModal(this)">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                {% endif %}
+
+                                {% if session.get('role') == 'admin' %}
+                                <form method="POST" action="{{ url_for('delete_document', doc_id=doc.id) }}" class="d-inline"
+                                      onsubmit="return confirm('ยืนยันการลบรายการ {{ doc.doc_type }} ที่ {{ doc.doc_number }}/{{ doc.doc_year }} ?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" style="height:30px;" title="ลบรายการ (เฉพาะผู้ดูแลระบบ)">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr id="emptyStateRow">
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
+                            ยังไม่มีรายการคำสั่งหรือประกาศในแฟ้มเก็บ
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Info & Controls -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+            <div class="text-secondary small" id="tableInfoText">
+                แสดงรายการทั้งหมด {{ documents|length }} รายการ
+            </div>
+            <nav>
+                <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 1: File Preview Modal (PDF & Images) -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-teal text-white">
+                <div>
+                    <h5 class="modal-title fw-bold mb-0" id="previewModalTitle">เปิดดูเอกสารแนบ</h5>
+                    <div class="small text-white-50 text-truncate" style="max-width: 700px;" id="previewModalSubtitle"></div>
+                </div>
+                <div class="d-flex align-items-center gap-2 ms-auto me-2">
+                    <a href="#" id="previewDownloadBtn" class="btn btn-sm btn-light text-teal fw-semibold">
+                        <i class="bi bi-download me-1"></i>ดาวน์โหลดไฟล์
+                    </a>
+                    <a href="#" id="previewNewTabBtn" target="_blank" class="btn btn-sm btn-outline-light">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>เปิดแท็บใหม่
+                    </a>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0 bg-dark d-flex justify-content-center align-items-center" style="min-height: 75vh;" id="previewModalBody">
+                <!-- Populated dynamically via JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 2: Edit Document / Attach or Replace File Modal -->
+<div class="modal fade" id="editDocModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <form class="modal-content border-0 shadow" method="POST" id="editDocForm" enctype="multipart/form-data">
+            <div class="modal-header bg-primary text-white" style="background-color: #3b5998 !important;">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-pencil-square me-2"></i>แก้ไขข้อมูล / แนบไฟล์คำสั่งหรือประกาศ
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-light border d-flex justify-content-between align-items-center py-2 px-3 mb-3">
+                    <div>
+                        <span class="text-secondary small">ประเภท:</span>
+                        <strong class="text-dark ms-1" id="editModalDocType"></strong>
+                    </div>
+                    <div>
+                        <span class="text-secondary small">เลขที่คำสั่ง/ประกาศ:</span>
+                        <span class="badge bg-primary fs-6 ms-1" id="editModalDocNum"></span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">เรื่อง <span class="text-danger">*</span></label>
+                    <textarea name="title" id="editModalTitle" rows="3" class="form-control" required></textarea>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">ลงวันที่ <span class="text-danger">*</span></label>
+                        <input type="date" name="doc_date" id="editModalDocDate" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">หมายเหตุเพิ่มเติม</label>
+                        <input type="text" name="note" id="editModalNote" class="form-control" placeholder="หมายเหตุ (ถ้ามี)">
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-3 bg-light border">
+                    <label class="form-label fw-bold mb-2">
+                        <i class="bi bi-paperclip text-teal me-1"></i>จัดการไฟล์เอกสารแนบ (จากการสแกน PDF, JPG, PNG)
+                    </label>
+
+                    <div id="currentFileBox" class="mb-2 d-none">
+                        <div class="d-flex align-items-center justify-content-between bg-white p-2 px-3 rounded border">
+                            <div class="text-truncate">
+                                <span class="badge bg-success me-2">มีไฟล์แนบแล้ว</span>
+                                <span id="currentFileName" class="small fw-semibold text-dark"></span>
+                            </div>
+                            <div class="form-check ms-3 mb-0">
+                                <input class="form-check-input" type="checkbox" name="remove_file" value="1" id="removeFileCheck">
+                                <label class="form-check-label small text-danger" for="removeFileCheck">
+                                    ลบไฟล์แนบ (เปลี่ยนกลับเป็นสถานะ "จอง")
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="file" name="attachment" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                    <div class="form-text small mt-1">
+                        หากเลือกไฟล์ใหม่ ระบบจะนำไฟล์ใหม่ไปแทนที่ไฟล์เดิม และเปลี่ยนสถานะเป็น <span class="badge-status-stored py-0 px-2" style="font-size: 0.72rem;">จัดเก็บ</span> โดยอัตโนมัติ
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary px-4" style="background-color: #3b5998; border-color: #3b5998;">
+                    <i class="bi bi-save me-1"></i>บันทึกการแก้ไข
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Preview Modal Handler
+    function openPreviewModal(docCode, docTitle, fileUrl, fileType, origName) {
+        document.getElementById('previewModalTitle').textContent = `${docCode} (${origName})`;
+        document.getElementById('previewModalSubtitle').textContent = docTitle;
+        document.getElementById('previewDownloadBtn').href = `${fileUrl}?download=1`;
+        document.getElementById('previewNewTabBtn').href = fileUrl;
+
+        const body = document.getElementById('previewModalBody');
+        body.innerHTML = '';
+
+        if (fileType === 'pdf') {
+            const iframe = document.createElement('iframe');
+            iframe.src = fileUrl;
+            iframe.style.width = '100%';
+            iframe.style.height = '75vh';
+            iframe.style.border = 'none';
+            body.appendChild(iframe);
+        } else {
+            const img = document.createElement('img');
+            img.src = fileUrl;
+            img.className = 'img-fluid rounded shadow my-3';
+            img.style.maxHeight = '72vh';
+            body.appendChild(img);
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        modal.show();
+    }
+
+    // Edit Modal Handler
+    function openEditModal(btn) {
+        const docId = btn.dataset.id;
+        const docType = btn.dataset.doctype;
+        const docNum = btn.dataset.docnum;
+        const title = btn.dataset.title;
+        const docDate = btn.dataset.docdate;
+        const note = btn.dataset.note;
+        const status = btn.dataset.status;
+        const filename = btn.dataset.filename;
+
+        const form = document.getElementById('editDocForm');
+        form.action = `/document/${docId}/edit`;
+
+        document.getElementById('editModalDocType').textContent = docType;
+        document.getElementById('editModalDocNum').textContent = docNum;
+        document.getElementById('editModalTitle').value = title;
+        document.getElementById('editModalDocDate').value = docDate;
+        document.getElementById('editModalNote').value = note;
+
+        const currentFileBox = document.getElementById('currentFileBox');
+        const removeCheck = document.getElementById('removeFileCheck');
+        removeCheck.checked = false;
+
+        if (status === 'stored' && filename) {
+            currentFileBox.classList.remove('d-none');
+            document.getElementById('currentFileName').textContent = filename;
+        } else {
+            currentFileBox.classList.add('d-none');
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('editDocModal'));
+        modal.show();
+    }
+
+    // Client-side Table Filtering & Pagination
+    const allRows = Array.from(document.querySelectorAll('#archiveTableBody tr.doc-row'));
+    const globalSearchInput = document.getElementById('globalSearchInput');
+    const colInputs = Array.from(document.querySelectorAll('.col-filter'));
+    const clearColBtn = document.getElementById('clearColFilters');
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    const paginationControls = document.getElementById('paginationControls');
+    const tableInfoText = document.getElementById('tableInfoText');
+
+    let currentPage = 1;
+
+    function filterAndRenderTable() {
+        const globalQuery = (globalSearchInput.value || '').trim().toLowerCase();
+        const colQueries = colInputs.map(input => ({
+            colIdx: parseInt(input.dataset.col, 10),
+            val: (input.value || '').trim().toLowerCase()
+        }));
+
+        const matchedRows = allRows.filter(row => {
+            const cells = row.querySelectorAll('td');
+            const rowText = row.innerText.toLowerCase();
+            if (globalQuery && !rowText.includes(globalQuery)) {
+                return false;
+            }
+            for (const cq of colQueries) {
+                if (cq.val) {
+                    const cellText = (cells[cq.colIdx]?.innerText || '').toLowerCase();
+                    if (!cellText.includes(cq.val)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        });
+
+        const pageSize = parseInt(pageSizeSelect.value, 10) || 10;
+        const totalMatched = matchedRows.length;
+        const totalPages = Math.max(1, Math.ceil(totalMatched / pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = startIdx + pageSize;
+
+        allRows.forEach(r => r.style.display = 'none');
+        matchedRows.slice(startIdx, endIdx).forEach(r => r.style.display = '');
+
+        // Info text
+        if (totalMatched === 0) {
+            tableInfoText.textContent = 'ไม่พบรายการที่ตรงกับเงื่อนไขการค้นหา';
+        } else {
+            const showEnd = Math.min(endIdx, totalMatched);
+            tableInfoText.textContent = `แสดง ${startIdx + 1} ถึง ${showEnd} จากทั้งหมด ${totalMatched} รายการ`;
+        }
+
+        // Render pagination buttons
+        paginationControls.innerHTML = '';
+        if (totalPages > 1) {
+            const createPageItem = (label, page, disabled = false, active = false) => {
+                const li = document.createElement('li');
+                li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
+                const a = document.createElement('a');
+                a.className = 'page-link';
+                a.href = '#';
+                a.textContent = label;
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (!disabled && currentPage !== page) {
+                        currentPage = page;
+                        filterAndRenderTable();
+                    }
+                });
+                li.appendChild(a);
+                return li;
+            };
+
+            paginationControls.appendChild(createPageItem('ก่อนหน้า', currentPage - 1, currentPage === 1));
+            for (let p = 1; p <= totalPages; p++) {
+                if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2) {
+                    paginationControls.appendChild(createPageItem(p, p, false, p === currentPage));
+                }
+            }
+            paginationControls.appendChild(createPageItem('ถัดไป', currentPage + 1, currentPage === totalPages));
+        }
+    }
+
+    if (allRows.length > 0) {
+        globalSearchInput.addEventListener('input', () => { currentPage = 1; filterAndRenderTable(); });
+        colInputs.forEach(inp => inp.addEventListener('input', () => { currentPage = 1; filterAndRenderTable(); }));
+        pageSizeSelect.addEventListener('change', () => { currentPage = 1; filterAndRenderTable(); });
+        clearColBtn.addEventListener('click', () => {
+            globalSearchInput.value = '';
+            colInputs.forEach(inp => inp.value = '');
+            currentPage = 1;
+            filterAndRenderTable();
+        });
+        filterAndRenderTable();
+    }
+</script>
+{% endblock %}
