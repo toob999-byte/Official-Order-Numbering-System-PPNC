@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ระบบจัดเก็บคำสั่งและประกาศศาล{% endblock %} - {{ sys_settings.get('org_name', 'ศาลยุติธรรม') }}</title>
+    <!-- Google Fonts: Sarabun -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">
+                    <span class="coj-badge">COJ</span>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title">GDMS</div>
+                    <div class="brand-subtitle">{{ sys_settings.get('org_name', 'ศาลยุติธรรม') }}</div>
+                </div>
+            </div>
+
+            <div class="sidebar-menu">
+                <div class="menu-section-label">คำสั่งและประกาศ</div>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a href="{{ url_for('create_document') }}" class="nav-link {% if request.endpoint == 'create_document' %}active{% endif %}">
+                            <i class="bi bi-plus-circle-fill"></i>
+                            <span>เพิ่มข้อมูล (ออกเลข)</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('archive') }}" class="nav-link {% if request.endpoint == 'archive' %}active{% endif %}">
+                            <i class="bi bi-folder2-open"></i>
+                            <span>แฟ้มเก็บ</span>
+                            {% if reserved_count > 0 %}
+                            <span class="badge rounded-pill bg-warning text-dark ms-auto" title="รายการจองเลขที่ยังไม่ได้แนบไฟล์">{{ reserved_count }}</span>
+                            {% endif %}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('reports') }}" class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}">
+                            <i class="bi bi-bar-chart-line-fill"></i>
+                            <span>รายงาน & สมุดคุม</span>
+                        </a>
+                    </li>
+                </ul>
+
+                {% if session.get('role') == 'admin' %}
+                <div class="menu-section-label mt-4">ส่วนผู้ดูแลระบบ</div>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a href="{{ url_for('admin_settings') }}" class="nav-link {% if request.endpoint == 'admin_settings' %}active{% endif %}">
+                            <i class="bi bi-sliders"></i>
+                            <span>ตั้งค่าเลขคำสั่ง / หน่วยงาน</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('admin_users') }}" class="nav-link {% if request.endpoint == 'admin_users' %}active{% endif %}">
+                            <i class="bi bi-people-fill"></i>
+                            <span>จัดการผู้ใช้งาน</span>
+                        </a>
+                    </li>
+                </ul>
+                {% endif %}
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar">
+                        <i class="bi bi-person-badge-fill"></i>
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name text-truncate">{{ session.get('full_name') }}</div>
+                        <div class="user-role">
+                            {% if session.get('role') == 'admin' %}
+                            <span class="badge bg-light text-teal">ผู้ดูแลระบบ</span>
+                            {% else %}
+                            <span class="text-white-50 small">{{ session.get('position') or 'ผู้ใช้งานทั่วไป' }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-light flex-grow-1" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                        <i class="bi bi-key"></i> เปลี่ยนรหัสผ่าน
+                    </button>
+                    <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger" title="ออกจากระบบ">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Top Navbar -->
+            <header class="top-navbar">
+                <div class="d-flex align-items-center gap-3">
+                    <button class="btn btn-light d-lg-none" id="sidebarToggle">
+                        <i class="bi bi-list fs-5"></i>
+                    </button>
+                    <div class="top-breadcrumb">
+                        <span class="text-teal fw-semibold"><i class="bi bi-house-door-fill me-1"></i>GDMS</span>
+                        <span class="text-muted mx-2">/</span>
+                        <span class="text-secondary">{{ sys_settings.get('org_name', 'ศาลยุติธรรม') }}</span>
+                        <span class="text-muted mx-2">/</span>
+                        <span class="fw-semibold text-dark">{% block page_header %}ระบบจัดเก็บคำสั่งและประกาศศาล{% endblock %}</span>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-none d-md-flex align-items-center gap-2 text-muted small bg-light px-3 py-1 rounded-pill border">
+                        <i class="bi bi-calendar3 text-teal"></i>
+                        <span>ปี พ.ศ. ปัจจุบัน: <strong>{{ current_byear }}</strong></span>
+                    </div>
+                    <a href="{{ url_for('create_document') }}" class="btn btn-teal btn-sm px-3 shadow-sm">
+                        <i class="bi bi-plus-lg me-1"></i> ออกเลขคำสั่ง/ประกาศ
+                    </a>
+                </div>
+            </header>
+
+            <!-- Page Body -->
+            <main class="content-container">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="flash-messages mb-3">
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm border-0 d-flex align-items-center" role="alert">
+                        {% if category == 'success' %}
+                        <i class="bi bi-check-circle-fill fs-5 me-2 text-success"></i>
+                        {% elif category == 'danger' %}
+                        <i class="bi bi-exclamation-triangle-fill fs-5 me-2 text-danger"></i>
+                        {% elif category == 'warning' %}
+                        <i class="bi bi-exclamation-circle-fill fs-5 me-2 text-warning"></i>
+                        {% else %}
+                        <i class="bi bi-info-circle-fill fs-5 me-2 text-info"></i>
+                        {% endif %}
+                        <div>{{ message }}</div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal: Change Own Password -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content border-0 shadow" method="POST" action="{{ url_for('change_own_password') }}">
+                <div class="modal-header bg-teal text-white">
+                    <h5 class="modal-title"><i class="bi bi-shield-lock me-2"></i>เปลี่ยนรหัสผ่านส่วนตัว</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">รหัสผ่านปัจจุบัน <span class="text-danger">*</span></label>
+                        <input type="password" name="current_password" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">รหัสผ่านใหม่ <span class="text-danger">*</span></label>
+                        <input type="password" name="new_password" class="form-control" minlength="4" required>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label fw-semibold">ยืนยันรหัสผ่านใหม่ <span class="text-danger">*</span></label>
+                        <input type="password" name="confirm_password" class="form-control" minlength="4" required>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-teal"><i class="bi bi-check2-circle me-1"></i>บันทึกรหัสผ่านใหม่</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5.3 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebar = document.getElementById('sidebar');
+        if (sidebarToggle && sidebar) {
+            sidebarToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('show');
+            });
+        }
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
