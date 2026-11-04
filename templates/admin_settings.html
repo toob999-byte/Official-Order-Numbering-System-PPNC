@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}ตั้งค่าเลขคำสั่งและหน่วยงาน{% endblock %}
+{% block page_header %}ตั้งค่าระบบ (ผู้ดูแลระบบ){% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Left Column: Numbering Configuration -->
+    <div class="col-lg-8">
+        <div class="gdms-card">
+            <div class="gdms-card-header">
+                <div><i class="bi bi-123 me-2"></i>ตั้งค่าเลขเริ่มต้นของคำสั่งและประกาศ (แยกตามปี พ.ศ.)</div>
+                <form method="GET" action="{{ url_for('admin_settings') }}" class="d-flex align-items-center gap-2 m-0">
+                    <span class="small">เลือกปี พ.ศ.:</span>
+                    <input type="number" name="year" value="{{ selected_year }}" class="form-control form-control-sm" style="width: 95px;" onchange="this.form.submit()">
+                </form>
+            </div>
+
+            <div class="p-4">
+                <div class="alert alert-info border-0 small mb-4">
+                    <i class="bi bi-info-circle-fill me-1"></i>
+                    <strong>หลักการทำงานของเลขรันอัตโนมัติ:</strong>
+                    ระบบจะรีเซ็ตเริ่มนับ <code>1</code> ใหม่ในทุกปี พ.ศ. โดยอัตโนมัติ แต่หากต้องการเริ่มใช้งานระบบกลางปี (ย้ายข้อมูลมาจากสมุดคุมเดิม)
+                    ผู้ดูแลระบบสามารถกำหนด <strong>เลขเริ่มต้น</strong> ของแต่ละประเภทได้ เช่น ตั้งค่าเป็น <code>119</code> ระบบจะออกเลขถัดไปเป็น <code>119/{{ selected_year }}</code> ทันที
+                </div>
+
+                <form method="POST" action="{{ url_for('admin_settings') }}">
+                    <input type="hidden" name="action" value="update_numbers">
+                    <input type="hidden" name="doc_year" value="{{ selected_year }}">
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ประเภทคำสั่ง/ประกาศ</th>
+                                    <th class="text-center">จำนวนเรื่องในปี {{ selected_year }}</th>
+                                    <th class="text-center">เลขสูงสุดที่ออกแล้ว</th>
+                                    <th style="width: 160px;">ตั้งค่าเลขเริ่มต้น</th>
+                                    <th class="text-center">เลขถัดไปที่จะได้รับ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for dt in DOC_TYPES %}
+                                {% set cfg = configs[dt] %}
+                                <tr>
+                                    <td class="fw-bold text-dark">{{ dt }}</td>
+                                    <td class="text-center">{{ cfg.total_docs }} เรื่อง</td>
+                                    <td class="text-center">
+                                        {% if cfg.max_number > 0 %}
+                                        <span class="badge bg-secondary">{{ cfg.max_number }}/{{ selected_year }}</span>
+                                        {% else %}
+                                        <span class="text-muted small">ยังไม่มีรายการ</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <input type="number" name="start_{{ dt }}" class="form-control text-center fw-bold"
+                                               min="1" value="{{ cfg.start_number }}" required>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-teal fs-6">{{ cfg.next_number }}/{{ selected_year }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="text-end mt-3">
+                        <button type="submit" class="btn btn-teal px-4">
+                            <i class="bi bi-save2 me-1"></i>บันทึกการตั้งค่าเลขประจำปี {{ selected_year }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Organization Settings -->
+    <div class="col-lg-4">
+        <div class="gdms-card">
+            <div class="gdms-card-header">
+                <div><i class="bi bi-building-gear me-2"></i>ตั้งค่าชื่อหน่วยงาน</div>
+            </div>
+            <div class="p-4">
+                <form method="POST" action="{{ url_for('admin_settings') }}">
+                    <input type="hidden" name="action" value="update_org">
+                    <input type="hidden" name="doc_year" value="{{ selected_year }}">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ชื่อหน่วยงาน / ศาล</label>
+                        <input type="text" name="org_name" class="form-control"
+                               value="{{ sys_settings.get('org_name', '') }}" required>
+                        <div class="form-text small">แสดงที่แถบเมนูด้านซ้าย หัวกระดาษสมุดคุม และไฟล์ Excel</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">ชื่อระบบงาน</label>
+                        <input type="text" name="system_title" class="form-control"
+                               value="{{ sys_settings.get('system_title', '') }}" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100" style="background-color: #3b5998; border-color: #3b5998;">
+                        <i class="bi bi-check2-circle me-1"></i>บันทึกข้อมูลหน่วยงาน
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
