@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>สมุดคุมทะเบียนคำสั่งและประกาศ - {{ sys_settings.get('org_name', 'ศาลยุติธรรม') }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            font-size: 14px;
+            color: #000;
+            background: #fff;
+        }
+        .print-container {
+            max-width: 1100px;
+            margin: 1.5rem auto;
+            padding: 1rem;
+        }
+        table.register-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table.register-table th,
+        table.register-table td {
+            border: 1px solid #333;
+            padding: 6px 8px;
+            vertical-align: top;
+        }
+        table.register-table th {
+            background-color: #f1f5f9 !important;
+            text-align: center;
+            font-weight: 700;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .print-container {
+                margin: 0;
+                padding: 0;
+                max-width: 100%;
+            }
+            @page {
+                size: A4 portrait;
+                margin: 12mm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-container">
+        <div class="no-print d-flex justify-content-between align-items-center mb-4 p-3 bg-light border rounded">
+            <div>
+                <strong>หน้าสำหรับพิมพ์สมุดคุมทะเบียนคำสั่งและประกาศ</strong>
+                <span class="text-muted small ms-2">(รองรับการสั่งพิมพ์ออกเครื่องพิมพ์ หรือ Save as PDF)</span>
+            </div>
+            <div class="d-flex gap-2">
+                <button onclick="window.print()" class="btn btn-primary btn-sm px-3">
+                    <i class="bi bi-printer-fill me-1"></i>สั่งพิมพ์ / บันทึกเป็น PDF
+                </button>
+                <button onclick="window.close()" class="btn btn-outline-secondary btn-sm">ปิดหน้าต่าง</button>
+            </div>
+        </div>
+
+        <div class="text-center mb-3">
+            <h5 class="fw-bold mb-1">สมุดทะเบียนคุม{{ filters.get('doc_type') or 'คำสั่งและประกาศ' }}</h5>
+            <h6 class="fw-semibold mb-1">{{ sys_settings.get('org_name', 'ศาลยุติธรรม') }}</h6>
+            <div class="small text-secondary">
+                {% if filters.get('year') %}ประจำปี พ.ศ. {{ filters.get('year') }}{% endif %}
+                (ข้อมูล ณ วันที่ {{ printed_at }} | รวม {{ documents|length }} รายการ)
+            </div>
+        </div>
+
+        <table class="register-table">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">ลำดับ</th>
+                    <th style="width: 95px;">เลขที่</th>
+                    <th style="width: 120px;">ประเภท</th>
+                    <th style="width: 110px;">ลงวันที่</th>
+                    <th>เรื่อง</th>
+                    <th style="width: 145px;">ผู้บันทึก</th>
+                    <th style="width: 85px;">สถานะ/หมายเหตุ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documents %}
+                <tr>
+                    <td class="text-center">{{ loop.index }}</td>
+                    <td class="text-center fw-bold">{{ doc.doc_number }}/{{ doc.doc_year }}</td>
+                    <td class="text-center">{{ doc.doc_type }}</td>
+                    <td class="text-center">{{ format_thai_date(doc.doc_date, short=True) }}</td>
+                    <td>{{ doc.title }}</td>
+                    <td>{{ doc.creator_name or '-' }}</td>
+                    <td class="text-center">
+                        {{ 'จัดเก็บ' if doc.status == 'stored' else 'จองเลข' }}
+                        {% if doc.note %}<div class="small text-muted">{{ doc.note }}</div>{% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4">ไม่มีรายการข้อมูล</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
