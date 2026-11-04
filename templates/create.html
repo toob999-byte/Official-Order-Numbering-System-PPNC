@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}เพิ่มคำสั่งหรือประกาศ{% endblock %}
+{% block page_header %}เพิ่มคำสั่งหรือประกาศ{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-9 col-lg-10">
+        <!-- Top System Tab Indicator matching screenshot -->
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <a href="{{ url_for('archive') }}" class="btn btn-outline-secondary bg-white border shadow-sm btn-sm px-3 py-2">
+                <i class="bi bi-folder2-open me-1"></i> แฟ้มเก็บคำสั่งและประกาศศาล
+            </a>
+            <span class="btn btn-primary btn-sm px-3 py-2 shadow-sm fw-semibold" style="background-color: #3b6ef5;">
+                <i class="bi bi-inbox-fill me-1"></i> ระบบจัดเก็บคำสั่งและประกาศศาล (ออกเลขคำสั่ง)
+            </span>
+        </div>
+
+        <h4 class="text-primary fw-bold mb-3" style="color: #2b579a !important;">เพิ่มคำสั่งหรือประกาศ</h4>
+
+        <div class="gdms-card gdms-card-accent p-4 p-md-5">
+            <form method="POST" action="{{ url_for('create_document') }}" enctype="multipart/form-data" id="createDocForm">
+                <!-- ประเภท -->
+                <div class="row mb-4">
+                    <label class="col-md-3 col-form-label fw-bold text-dark">
+                        ประเภท <span class="text-danger">*</span>
+                    </label>
+                    <div class="col-md-9">
+                        <div class="row g-2">
+                            {% for dt in DOC_TYPES %}
+                            <div class="col-sm-6">
+                                <label class="doctype-option {% if loop.first %}active{% endif %}" for="dtype_{{ loop.index }}">
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input doc-type-radio" type="radio" name="doc_type"
+                                               id="dtype_{{ loop.index }}" value="{{ dt }}" {% if loop.first %}checked{% endif %} required>
+                                        <span class="ms-2">{{ dt }}</span>
+                                    </div>
+                                    <span class="badge bg-white text-teal border">
+                                        เลขถัดไป: <strong class="next-num-span" data-dtype="{{ dt }}">{{ next_numbers[dt] }}/{{ current_byear }}</strong>
+                                    </span>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Live Next Number Preview Banner -->
+                        <div class="mt-2 p-2 px-3 rounded-3 bg-light border d-flex align-items-center justify-content-between">
+                            <span class="text-secondary small">
+                                <i class="bi bi-hash text-teal me-1"></i>เลขที่จะได้รับอัตโนมัติเมื่อกดบันทึก:
+                            </span>
+                            <span class="fs-5 fw-bold text-primary" id="liveNumberPreview">
+                                {{ DOC_TYPES[0] }} ที่ {{ next_numbers[DOC_TYPES[0]] }}/{{ current_byear }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- เรื่อง -->
+                <div class="row mb-4">
+                    <label for="titleInput" class="col-md-3 col-form-label fw-bold text-dark">
+                        เรื่อง <span class="text-danger">*</span>
+                    </label>
+                    <div class="col-md-9">
+                        <textarea name="title" id="titleInput" rows="3" class="form-control"
+                                  placeholder="เรื่อง ของคำสั่งหรือประกาศ" required></textarea>
+                    </div>
+                </div>
+
+                <!-- ลงวันที่ -->
+                <div class="row mb-4">
+                    <label for="docDateInput" class="col-md-3 col-form-label fw-bold text-dark">
+                        ลงวันที่ <span class="text-danger">*</span>
+                    </label>
+                    <div class="col-md-5 col-sm-7">
+                        <input type="date" name="doc_date" id="docDateInput" class="form-control"
+                               value="{{ today_iso }}" required>
+                        <div class="form-text text-muted small">
+                            ระบบจะคำนวณปี พ.ศ. ของเลขที่คำสั่งตามปีที่ลงวันที่ (รีเซ็ตเริ่มนับ 1 ใหม่ทุกปี พ.ศ.)
+                        </div>
+                    </div>
+                </div>
+
+                <!-- แนบไฟล์ -->
+                <div class="row mb-4">
+                    <label for="attachmentInput" class="col-md-3 col-form-label fw-bold text-dark">
+                        แนบไฟล์
+                    </label>
+                    <div class="col-md-9">
+                        <input type="file" name="attachment" id="attachmentInput" class="form-control"
+                               accept=".pdf,.jpg,.jpeg,.png">
+                        <div class="mt-2">
+                            <span class="text-danger fw-semibold small">
+                                <i class="bi bi-info-circle-fill me-1"></i>หมายเหตุ: ไม่ได้แนบไฟล์ ระบบถือว่าเป็นการจองเลข
+                            </span>
+                            <span class="text-muted small d-block mt-1">
+                                (สามารถนำไฟล์เอกสารคำสั่งที่สแกนแล้ว .pdf, .jpg, .png มาแนบตามหลังได้ที่เมนู <strong>แฟ้มเก็บ</strong>)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- หมายเหตุเพิ่มเติม (Optional) -->
+                <div class="row mb-4">
+                    <label for="noteInput" class="col-md-3 col-form-label fw-bold text-dark">
+                        หมายเหตุเพิ่มเติม
+                    </label>
+                    <div class="col-md-9">
+                        <input type="text" name="note" id="noteInput" class="form-control"
+                               placeholder="ระบุหมายเหตุภายใน (ถ้ามี)">
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary px-5 py-2 fw-semibold shadow-sm" style="background-color: #3b6ef5; border-color: #3b6ef5;">
+                        <i class="bi bi-save2 me-2"></i>บันทึก
+                    </button>
+                    <a href="{{ url_for('archive') }}" class="btn btn-light border px-4 py-2 ms-2">
+                        ยกเลิก
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const radioButtons = document.querySelectorAll('.doc-type-radio');
+    const docDateInput = document.getElementById('docDateInput');
+    const livePreview = document.getElementById('liveNumberPreview');
+    const optionLabels = document.querySelectorAll('.doctype-option');
+
+    function updateNextNumberPreview() {
+        const selectedRadio = document.querySelector('.doc-type-radio:checked');
+        if (!selectedRadio) return;
+
+        const docType = selectedRadio.value;
+        const docDate = docDateInput.value;
+
+        optionLabels.forEach(lbl => lbl.classList.remove('active'));
+        selectedRadio.closest('.doctype-option').classList.add('active');
+
+        fetch(`{{ url_for('api_next_number') }}?doc_type=${encodeURIComponent(docType)}&doc_date=${encodeURIComponent(docDate)}`)
+            .then(res => res.json())
+            .then(data => {
+                livePreview.textContent = `${data.doc_type} ที่ ${data.formatted}`;
+                const badgeSpan = document.querySelector(`.next-num-span[data-dtype="${data.doc_type}"]`);
+                if (badgeSpan) {
+                    badgeSpan.textContent = data.formatted;
+                }
+            })
+            .catch(() => {});
+    }
+
+    radioButtons.forEach(rb => rb.addEventListener('change', updateNextNumberPreview));
+    docDateInput.addEventListener('change', updateNextNumberPreview);
+</script>
+{% endblock %}
