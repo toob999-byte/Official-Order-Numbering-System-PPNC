@@ -20,6 +20,7 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+import bcrypt
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
@@ -94,8 +95,24 @@ def inject_globals():
 
 
 # -------------------------------------------------------------------------
-# Authentication Routes
+# Authentication Helpers & Routes
 # -------------------------------------------------------------------------
+def verify_user_password(stored_hash: str, password: str) -> bool:
+    if not stored_hash or not password:
+        return False
+    # Support legacy Laravel/PHP bcrypt hashes ($2y$ / $2a$ / $2b$)
+    if stored_hash.startswith(("$2y$", "$2a$", "$2b$")):
+        try:
+            normalized = "$2b$" + stored_hash[4:]
+            return bcrypt.checkpw(password.encode("utf-8"), normalized.encode("utf-8"))
+        except Exception:
+            return False
+    try:
+        return check_password_hash(stored_hash, password)
+    except Exception:
+        return False
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if "user_id" in session:
@@ -111,7 +128,7 @@ def login():
         ).fetchone()
         conn.close()
 
-        if user and user["is_active"] == 1 and check_password_hash(user["password_hash"], password):
+        if user and user["is_active"] == 1 and verify_user_password(user["password_hash"], password):
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["full_name"] = user["full_name"]
@@ -150,7 +167,7 @@ def change_own_password():
 
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
-    if not user or not check_password_hash(user["password_hash"], current_password):
+    if not user or not verify_user_password(user["password_hash"], current_password):
         conn.close()
         flash("รหัสผ่านปัจจุบันไม่ถูกต้อง", "danger")
         return redirect(request.referrer or url_for("archive"))
@@ -541,14 +558,30 @@ def serve_file(filename):
     ).fetchone()
     conn.close()
 
+    # Check if file exists at UPLOAD_FOLDER/<filename>, or fallback to flat UPLOAD_FOLDER/<basename>
+    target_path = filename
+    full_candidate = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(full_candidate):
+        base_only = os.path.basename(filename)
+        if os.path.exists(os.path.join(UPLOAD_FOLDER, base_only)):
+            target_path = base_only
+        else:
+            return (
+                f"<div style='font-family:sans-serif;text-align:center;padding:3rem;color:#fff;'>"
+                f"<h4>ไม่พบไฟล์เอกสารแนบ ({filename}) ในโฟลเดอร์ uploads/</h4>"
+                f"<p>รายการนี้ถูกนำเข้าจากฐานข้อมูลระบบเดิม กรุณาคัดลอกไฟล์ PDF จากโฟลเดอร์เก็บไฟล์ของระบบเดิมมาวางในโฟลเดอร์ <code>uploads/</code> หรืออัปโหลดไฟล์ใหม่ที่ปุ่มแก้ไข</p>"
+                f"</div>",
+                404,
+            )
+
     if download and doc and doc["original_filename"]:
         return send_from_directory(
             UPLOAD_FOLDER,
-            filename,
+            target_path,
             as_attachment=True,
             download_name=doc["original_filename"],
         )
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    return send_from_directory(UPLOAD_FOLDER, target_path)
 
 
 # -------------------------------------------------------------------------
