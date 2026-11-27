@@ -115,7 +115,12 @@
                         <td>
                             {% if doc.status == 'stored' and doc.file_path %}
                             <a href="#" class="doc-num-badge"
-                               onclick="openPreviewModal('{{ doc.doc_type }} ที่ {{ doc.doc_number }}/{{ doc.doc_year }}', '{{ doc.title|e }}', '{{ url_for('serve_file', filename=doc.file_path) }}', '{{ doc.file_type }}', '{{ doc.original_filename|e }}'); return false;">
+                               data-code="{{ doc.doc_type }} ที่ {{ doc.doc_number }}/{{ doc.doc_year }}"
+                               data-title="{{ doc.title }}"
+                               data-url="{{ url_for('serve_file', filename=doc.file_path) }}"
+                               data-ftype="{{ doc.file_type }}"
+                               data-origname="{{ doc.original_filename or '' }}"
+                               onclick="openPreviewFromBtn(this); return false;">
                                 {{ doc.doc_number }}/{{ doc.doc_year }}
                             </a>
                             {% else %}
@@ -143,7 +148,12 @@
                                 {% if doc.status == 'stored' and doc.file_path %}
                                 <!-- Green Paperclip Button to Preview/Download Attached File -->
                                 <button type="button" class="btn-action-attach" title="เปิดดูไฟล์เอกสารที่แนบ ({{ doc.original_filename }})"
-                                        onclick="openPreviewModal('{{ doc.doc_type }} ที่ {{ doc.doc_number }}/{{ doc.doc_year }}', '{{ doc.title|e }}', '{{ url_for('serve_file', filename=doc.file_path) }}', '{{ doc.file_type }}', '{{ doc.original_filename|e }}')">
+                                        data-code="{{ doc.doc_type }} ที่ {{ doc.doc_number }}/{{ doc.doc_year }}"
+                                        data-title="{{ doc.title }}"
+                                        data-url="{{ url_for('serve_file', filename=doc.file_path) }}"
+                                        data-ftype="{{ doc.file_type }}"
+                                        data-origname="{{ doc.original_filename or '' }}"
+                                        onclick="openPreviewFromBtn(this)">
                                     <i class="bi bi-paperclip"></i>
                                 </button>
                                 {% endif %}
@@ -303,6 +313,16 @@
 {% block extra_scripts %}
 <script>
     // Preview Modal Handler
+    function openPreviewFromBtn(el) {
+        openPreviewModal(
+            el.dataset.code || '',
+            el.dataset.title || '',
+            el.dataset.url || '',
+            el.dataset.ftype || 'pdf',
+            el.dataset.origname || ''
+        );
+    }
+
     function openPreviewModal(docCode, docTitle, fileUrl, fileType, origName) {
         document.getElementById('previewModalTitle').textContent = `${docCode} (${origName})`;
         document.getElementById('previewModalSubtitle').textContent = docTitle;
